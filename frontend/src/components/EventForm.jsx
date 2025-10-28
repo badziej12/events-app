@@ -1,17 +1,19 @@
 import {
   Form,
-  redirect,
-  useActionData,
   useNavigate,
   useNavigation,
+  useActionData,
+  json,
+  redirect,
 } from "react-router-dom";
 
 import classes from "./EventForm.module.css";
+import { getAuthToken } from "../utils/auth";
 
 function EventForm({ method, event }) {
+  const data = useActionData();
   const navigate = useNavigate();
   const navigation = useNavigation();
-  const data = useActionData();
 
   const isSubmitting = navigation.state === "submitting";
 
@@ -30,12 +32,12 @@ function EventForm({ method, event }) {
       )}
       <p>
         <label htmlFor="title">Title</label>
-
         <input
           id="title"
           type="text"
           name="title"
-          defaultValue={event?.title}
+          required
+          defaultValue={event ? event.title : ""}
         />
       </p>
       <p>
@@ -45,7 +47,7 @@ function EventForm({ method, event }) {
           type="url"
           name="image"
           required
-          defaultValue={event?.image}
+          defaultValue={event ? event.image : ""}
         />
       </p>
       <p>
@@ -55,7 +57,7 @@ function EventForm({ method, event }) {
           type="date"
           name="date"
           required
-          defaultValue={event?.date}
+          defaultValue={event ? event.date : ""}
         />
       </p>
       <p>
@@ -65,15 +67,15 @@ function EventForm({ method, event }) {
           name="description"
           rows="5"
           required
-          defaultValue={event?.description}
+          defaultValue={event ? event.description : ""}
         />
       </p>
       <div className={classes.actions}>
-        <button disabled={isSubmitting} type="button" onClick={cancelHandler}>
+        <button type="button" onClick={cancelHandler} disabled={isSubmitting}>
           Cancel
         </button>
         <button disabled={isSubmitting}>
-          {isSubmitting ? "Is submitting ..." : "Save"}
+          {isSubmitting ? "Submitting..." : "Save"}
         </button>
       </div>
     </Form>
@@ -82,7 +84,8 @@ function EventForm({ method, event }) {
 
 export default EventForm;
 
-export const action = async ({ request, params }) => {
+export async function action({ request, params }) {
+  const method = request.method;
   const data = await request.formData();
 
   const eventData = {
@@ -94,15 +97,19 @@ export const action = async ({ request, params }) => {
 
   let url = "http://localhost:8080/events";
 
-  if (request.method === "PATCH") {
-    const eventId = params.id;
-    url += `/${eventId}`;
+  if (method === "PATCH") {
+    const eventId = params.eventId;
+    url = "http://localhost:8080/events/" + eventId;
   }
 
+  const token = getAuthToken();
+  console.log(token);
+
   const response = await fetch(url, {
-    method: request.method,
+    method: method,
     headers: {
       "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
     },
     body: JSON.stringify(eventData),
   });
@@ -112,8 +119,8 @@ export const action = async ({ request, params }) => {
   }
 
   if (!response.ok) {
-    throw new Error("Could not send data!");
+    throw json({ message: "Could not save event." }, { status: 500 });
   }
 
   return redirect("/events");
-};
+}
